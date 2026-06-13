@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QCode — defaltho</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap">
+<style>
+/* ============================================================
+   defaltho — Experiments tool base
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #000;
+  overflow: hidden;
+  font-family: 'Inter', 'Inter Fallback', Helvetica, Arial, sans-serif;
+}
+canvas { display: block; }
+
+#panel {
+  position: fixed; top: 22px; left: 22px;
+  z-index: 200;
+  width: 208px;
+  background: rgba(0,0,0,0.78);
+  border-radius: 6px;
+  padding: 12px 14px;
+  color: #fff;
+  font-size: 11px;
+  user-select: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: opacity 0.2s;
+}
+#panel.hidden { opacity: 0; pointer-events: none; }
+
+#panel .panel-title {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.slider-row { margin-bottom: 4px; }
+.slider-row .lbl {
+  display: flex; justify-content: space-between;
+  font-size: 10px; color: rgba(255,255,255,0.6);
+  margin-bottom: 1px;
+}
+.slider-row .lbl span { color: #fff; }
+.slider-row input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 6px; border-radius: 3px;
+  background: #333; outline: none;
+}
+.slider-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; cursor: pointer;
+}
+.slider-row input[type=range]::-moz-range-thumb {
+  width: 14px; height: 14px; border: none; border-radius: 50%;
+  background: #fff; cursor: pointer;
+}
+
+.section-label {
+  color: rgba(255,255,255,0.45);
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;
+  margin: 10px 0 5px;
+}
+
+.tool-btn {
+  width: 100%; padding: 6px; border: none; border-radius: 3px;
+  background: #222; color: #888; font-size: 10px;
+  cursor: pointer; margin-top: 8px; font-weight: 600;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.tool-btn:hover { background: #333; color: #ccc; }
+.tool-btn.active { background: #fff; color: #000; }
+
+.hint {
+  text-align: center; color: rgba(255,255,255,0.25);
+  font-size: 9px; margin-top: 8px;
+}
+
+@media (max-width: 700px) {
+  #panel { width: calc(100vw - 44px); top: 22px; }
+}
+
+#panel.dock-right { left: auto; right: 22px; }
+
+#panel {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #444 transparent;
+}
+#panel::-webkit-scrollbar { width: 6px; }
+#panel::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+.ctl { margin-bottom: 7px; }
+.ctl .lbl {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 10px; color: rgba(255,255,255,0.6); margin-bottom: 3px;
+}
+.ctl .lbl span { color: #fff; }
+.ctl .lbl .val { color: rgba(255,255,255,0.55); }
+.ctl .lbl .val.mono { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+
+.ctl-section {
+  color: rgba(255,255,255,0.45);
+  font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin: 14px 0 7px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.ctl-section:first-child { margin-top: 0; }
+.ctl-note { color: rgba(255,255,255,0.35); font-size: 9px; line-height: 1.5; }
+
+.ctl-slider input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 6px; border-radius: 3px; background: #333; outline: none;
+}
+.ctl-slider input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%; background: #fff; cursor: pointer;
+}
+.ctl-slider input[type=range]::-moz-range-thumb {
+  width: 14px; height: 14px; border: none; border-radius: 50%; background: #fff; cursor: pointer;
+}
+
+.select-wrap { position: relative; }
+.select-wrap::after {
+  content: "▾"; position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+  color: rgba(255,255,255,0.5); font-size: 9px; pointer-events: none;
+}
+.ctl-select select, .ctl-text input, .ctl-number input {
+  width: 100%; appearance: none; -webkit-appearance: none;
+  background: #1a1a1a; color: #fff; border: 1px solid #333; border-radius: 4px;
+  padding: 6px 22px 6px 8px; font: inherit; font-size: 11px; cursor: pointer;
+}
+.ctl-text input, .ctl-number input { padding-right: 8px; cursor: text; }
+.ctl-select select:focus, .ctl-text input:focus, .ctl-number input:focus {
+  outline: none; border-color: #666;
+}
+
+.seg { display: flex; gap: 4px; flex-wrap: wrap; }
+.seg-btn {
+  flex: 1 1 auto; min-width: 0; padding: 5px 6px; border: 1px solid #333;
+  border-radius: 4px; background: #1a1a1a; color: #888;
+  font: inherit; font-size: 10px; font-weight: 600; cursor: pointer;
+  transition: all 0.12s; white-space: nowrap;
+}
+.seg-btn:hover { color: #ccc; border-color: #555; }
+.seg-btn.active { background: #fff; color: #000; border-color: #fff; }
+
+.ctl-color input[type=color] {
+  width: 100%; height: 26px; border: 1px solid #333; border-radius: 4px;
+  background: #1a1a1a; padding: 2px; cursor: pointer;
+}
+.ctl-color input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.ctl-color input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+.ctl-toggle { display: flex; justify-content: space-between; align-items: center; }
+.ctl-toggle .lbl-inline { font-size: 11px; color: #fff; }
+.switch {
+  width: 34px; height: 18px; border-radius: 9px; border: 1px solid #444;
+  background: #1a1a1a; position: relative; cursor: pointer; padding: 0; flex: 0 0 auto;
+  transition: background 0.15s, border-color 0.15s;
+}
+.switch i {
+  position: absolute; top: 2px; left: 2px; width: 12px; height: 12px;
+  border-radius: 50%; background: #777; transition: transform 0.15s, background 0.15s;
+}
+.switch.on { background: #fff; border-color: #fff; }
+.switch.on i { transform: translateX(16px); background: #000; }
+
+.swatch-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.swatch { position: relative; width: 28px; height: 28px; }
+.swatch input[type=color] {
+  width: 100%; height: 100%; border: 1px solid #333; border-radius: 4px;
+  background: none; padding: 0; cursor: pointer;
+}
+.swatch input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.swatch input[type=color]::-webkit-color-swatch { border: none; border-radius: 3px; }
+.swatch .sw-x {
+  position: absolute; top: -6px; right: -6px; width: 15px; height: 15px;
+  border-radius: 50%; border: none; background: #000; color: #fff; font-size: 11px;
+  line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.12s;
+}
+.swatch:hover .sw-x { opacity: 1; }
+.swatch-add {
+  width: 28px; height: 28px; border: 1px dashed #444; border-radius: 4px;
+  background: transparent; color: #888; font-size: 15px; cursor: pointer;
+}
+.swatch-add:hover { color: #fff; border-color: #777; }
+
+.tool-btn.primary { background: #fff; color: #000; }
+.tool-btn.primary:hover { background: #ddd; color: #000; }
+.ctl-file, .ctl-button { margin-bottom: 7px; }
+
+/* tool-specific */
+#stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+#qr { line-height: 0; }
+#qr svg { display: block; }
+</style>
+</head>
+<body>
+
+<div id="stage"><div id="qr"></div></div>
+
+<div id="panel" class="dock-right">
+  <div class="panel-title">QCode</div>
+  <div id="controls"></div>
+  <div class="hint">H = hide panel</div>
+</div>
+
+<script>
+/* ============================================================
+   defaltho — Experiments shared control kit
+   buildPanel(container, schema, onChange)
+   ============================================================ */
+function buildPanel(container, schema, onChange) {
+  const values = {};
+  const els = {};
+  const fire = (id) => { if (onChange) onChange(values, id); };
+
+  function fmt(v, step) {
+    const dec = (String(step).split('.')[1] || '').length;
+    return dec ? Number(v).toFixed(Math.min(dec, 3)) : String(v);
+  }
+  function normOptions(opts) {
+    return (opts || []).map((o) =>
+      (typeof o === 'object') ? o : { value: o, label: String(o) });
+  }
+  function row(cls) {
+    const r = document.createElement('div');
+    r.className = 'ctl ' + (cls || '');
+    container.appendChild(r);
+    return r;
+  }
+
+  schema.forEach((def) => {
+    const t = def.type;
+
+    if (t === 'section') {
+      const r = row('ctl-section');
+      r.textContent = def.label;
+      return;
+    }
+    if (t === 'note') {
+      const r = row('ctl-note');
+      r.textContent = def.text;
+      return;
+    }
+
+    if (t === 'slider') {
+      values[def.id] = def.val;
+      const r = row('ctl-slider');
+      r.innerHTML =
+        '<div class="lbl"><span>' + def.label + '</span>' +
+        '<span class="val">' + fmt(def.val, def.step) + '</span></div>' +
+        '<input type="range" min="' + def.min + '" max="' + def.max +
+        '" step="' + def.step + '" value="' + def.val + '">';
+      const input = r.querySelector('input');
+      const valEl = r.querySelector('.val');
+      els[def.id] = input;
+      input.addEventListener('input', function () {
+        values[def.id] = parseFloat(this.value);
+        valEl.textContent = fmt(values[def.id], def.step);
+        fire(def.id);
+      });
+      return;
+    }
+
+    if (t === 'select') {
+      values[def.id] = def.val;
+      const r = row('ctl-select');
+      const opts = normOptions(def.options);
+      r.innerHTML =
+        '<div class="lbl"><span>' + def.label + '</span></div>' +
+        '<div class="select-wrap"><select>' +
+        opts.map((o) => '<option value="' + o.value + '"' +
+          (o.value === def.val ? ' selected' : '') + '>' + o.label + '</option>').join('') +
+        '</select></div>';
+      const sel = r.querySelector('select');
+      els[def.id] = sel;
+      sel.addEventListener('change', function () {
+        values[def.id] = this.value;
+        fire(def.id);
+      });
+      return;
+    }
+
+    if (t === 'segmented') {
+      values[def.id] = def.val;
+      const r = row('ctl-segmented');
+      const opts = normOptions(def.options);
+      r.innerHTML = '<div class="lbl"><span>' + def.label + '</span></div>' +
+        '<div class="seg"></div>';
+      const seg = r.querySelector('.seg');
+      opts.forEach((o) => {
+        const b = document.createElement('button');
+        b.className = 'seg-btn' + (o.value === def.val ? ' active' : '');
+        b.textContent = o.label;
+        b.addEventListener('click', () => {
+          values[def.id] = o.value;
+          seg.querySelectorAll('.seg-btn').forEach((x) => x.classList.remove('active'));
+          b.classList.add('active');
+          fire(def.id);
+        });
+        seg.appendChild(b);
+      });
+      els[def.id] = seg;
+      return;
+    }
+
+    if (t === 'color') {
+      values[def.id] = def.val;
+      const r = row('ctl-color');
+      r.innerHTML =
+        '<div class="lbl"><span>' + def.label + '</span>' +
+        '<span class="val mono">' + def.val + '</span></div>' +
+        '<input type="color" value="' + def.val + '">';
+      const input = r.querySelector('input');
+      const valEl = r.querySelector('.val');
+      els[def.id] = input;
+      input.addEventListener('input', function () {
+        values[def.id] = this.value;
+        valEl.textContent = this.value;
+        fire(def.id);
+      });
+      return;
+    }
+
+    if (t === 'toggle') {
+      values[def.id] = !!def.val;
+      const r = row('ctl-toggle');
+      r.innerHTML =
+        '<span class="lbl-inline">' + def.label + '</span>' +
+        '<button class="switch' + (def.val ? ' on' : '') +
+        '" role="switch" aria-checked="' + !!def.val + '"><i></i></button>';
+      const btn = r.querySelector('.switch');
+      els[def.id] = btn;
+      btn.addEventListener('click', () => {
+        values[def.id] = !values[def.id];
+        btn.classList.toggle('on', values[def.id]);
+        btn.setAttribute('aria-checked', values[def.id]);
+        fire(def.id);
+      });
+      return;
+    }
+
+    if (t === 'text') {
+      values[def.id] = def.val || '';
+      const r = row('ctl-text');
+      r.innerHTML =
+        '<div class="lbl"><span>' + def.label + '</span></div>' +
+        '<input type="text" value="' + (def.val || '').replace(/"/g, '&quot;') +
+        '" placeholder="' + (def.placeholder || '') + '">';
+      const input = r.querySelector('input');
+      els[def.id] = input;
+      input.addEventListener('input', function () {
+        values[def.id] = this.value;
+        fire(def.id);
+      });
+      return;
+    }
+
+    if (t === 'number') {
+      values[def.id] = def.val;
+      const r = row('ctl-number');
+      r.innerHTML =
+        '<div class="lbl"><span>' + def.label + '</span></div>' +
+        '<input type="number" value="' + def.val + '"' +
+        (def.min != null ? ' min="' + def.min + '"' : '') +
+        (def.max != null ? ' max="' + def.max + '"' : '') +
+        (def.step != null ? ' step="' + def.step + '"' : '') + '>';
+      const input = r.querySelector('input');
+      els[def.id] = input;
+      input.addEventListener('input', function () {
+        values[def.id] = this.value === '' ? '' : parseFloat(this.value);
+        fire(def.id);
+      });
+      return;
+    }
+
+    if (t === 'swatches') {
+      values[def.id] = (def.val || ['#ffffff']).slice();
+      const r = row('ctl-swatches');
+      r.innerHTML =
+        '<div class="lbl"><span>' + def.label + '</span>' +
+        '<span class="val count"></span></div><div class="swatch-list"></div>';
+      const list = r.querySelector('.swatch-list');
+      const count = r.querySelector('.count');
+      const minN = def.min || 1, maxN = def.max || 16;
+
+      function render() {
+        list.innerHTML = '';
+        count.textContent = values[def.id].length;
+        values[def.id].forEach((hex, i) => {
+          const chip = document.createElement('div');
+          chip.className = 'swatch';
+          chip.innerHTML =
+            '<input type="color" value="' + hex + '">' +
+            (values[def.id].length > minN ? '<button class="sw-x" title="remove">×</button>' : '');
+          const ci = chip.querySelector('input');
+          ci.addEventListener('input', function () {
+            values[def.id][i] = this.value;
+            fire(def.id);
+          });
+          const rm = chip.querySelector('.sw-x');
+          if (rm) rm.addEventListener('click', () => {
+            values[def.id].splice(i, 1); render(); fire(def.id);
+          });
+          list.appendChild(chip);
+        });
+        if (values[def.id].length < maxN) {
+          const add = document.createElement('button');
+          add.className = 'swatch-add'; add.textContent = '+';
+          add.title = 'add colour';
+          add.addEventListener('click', () => {
+            const last = values[def.id][values[def.id].length - 1] || '#888888';
+            values[def.id].push(last); render(); fire(def.id);
+          });
+          list.appendChild(add);
+        }
+      }
+      els[def.id] = { render, el: list };
+      render();
+      return;
+    }
+
+    if (t === 'file') {
+      const r = row('ctl-file');
+      const accept = def.accept || '';
+      r.innerHTML =
+        '<button class="tool-btn">' + (def.label || 'Upload') + '</button>' +
+        '<input type="file" accept="' + accept + '" hidden>';
+      const btn = r.querySelector('.tool-btn');
+      const input = r.querySelector('input');
+      els[def.id] = input;
+      btn.addEventListener('click', () => input.click());
+      input.addEventListener('change', function () {
+        const f = this.files && this.files[0];
+        if (!f || !def.onFile) return;
+        const reader = new FileReader();
+        reader.onload = () => def.onFile(reader.result, f);
+        if (def.asText) reader.readAsText(f); else reader.readAsDataURL(f);
+      });
+      return;
+    }
+
+    if (t === 'button') {
+      const r = row('ctl-button');
+      r.innerHTML = '<button class="tool-btn' +
+        (def.variant === 'primary' ? ' primary' : '') + '">' + def.label + '</button>';
+      const btn = r.querySelector('button');
+      els[def.id] = btn;
+      btn.addEventListener('click', () => { if (def.onClick) def.onClick(values); });
+      return;
+    }
+  });
+
+  return {
+    values,
+    get: (id) => values[id],
+    el: (id) => els[id],
+    set(id, v) {
+      values[id] = v;
+      const e = els[id];
+      if (!e) return;
+      if (e.tagName === 'SELECT' || e.type === 'range' || e.type === 'color' ||
+          e.type === 'text' || e.type === 'number') {
+        e.value = v;
+        const valEl = e.parentElement.querySelector('.val');
+        if (valEl && e.type !== 'text') valEl.textContent = v;
+      } else if (e.classList && e.classList.contains('switch')) {
+        e.classList.toggle('on', !!v); e.setAttribute('aria-checked', !!v);
+      } else if (e.render) { e.render(); }
+    },
+    refresh() { if (onChange) onChange(values, null); },
+  };
+}
+</script>
+<script>
+// ── defaltho — QR Code (custom dot renderer + data builder) ──
+// Engine: qrcode-generator gives the module matrix; we render dots/rings
+// ourselves for the circular, designer look, and build typed payloads
+// (vCard contact, Wi-Fi, email, …). Strictly-controllable, B&W default.
+
+let logoImg = null, logoData = null;
+
+// ── Build the payload string from the active data type ──
+function dataString() {
+  const v = P.values, t = v.dtype;
+  if (t === 'contact') {
+    const fn = (v.vcFirst + ' ' + v.vcLast).trim();
+    return ['BEGIN:VCARD', 'VERSION:3.0',
+      'N:' + v.vcLast + ';' + v.vcFirst, 'FN:' + fn,
+      v.vcOrg ? 'ORG:' + v.vcOrg : '', v.vcTitle ? 'TITLE:' + v.vcTitle : '',
+      v.vcPhone ? 'TEL;TYPE=CELL:' + v.vcPhone : '', v.vcEmail ? 'EMAIL:' + v.vcEmail : '',
+      v.vcUrl ? 'URL:' + v.vcUrl : '', v.vcAddr ? 'ADR:;;' + v.vcAddr : '',
+      'END:VCARD'].filter(Boolean).join('\n');
+  }
+  if (t === 'wifi') return 'WIFI:T:' + v.wEnc + ';S:' + v.wSsid + ';P:' + v.wPass + ';' + (v.wHidden ? 'H:true;' : '') + ';';
+  if (t === 'email') return 'mailto:' + v.eTo + ((v.eSub || v.eBody) ? '?subject=' + encodeURIComponent(v.eSub || '') + '&body=' + encodeURIComponent(v.eBody || '') : '');
+  if (t === 'phone') return 'tel:' + v.pNum;
+  if (t === 'sms') return 'SMSTO:' + v.sNum + ':' + (v.sBody || '');
+  if (t === 'geo') return 'geo:' + v.gLat + ',' + v.gLng;
+  return v.data || ' ';
+}
+
+function computeMatrix() {
+  try {
+    const qr = qrcode(0, P.values.ecl);
+    qr.addData(dataString());
+    qr.make();
+    const n = qr.getModuleCount();
+    return { count: n, isDark: (r, c) => qr.isDark(r, c) };
+  } catch (e) { console.warn('QR:', e.message); return null; }
+}
+
+// ── Emitters: a canvas one (display/PNG) and an SVG one (export) ──
+function canvasEm(g) {
+  return {
+    rect: (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); },
+    disc: (x, y, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); },
+    gradient: (a, b, s) => { const lg = g.createLinearGradient(0, 0, s, s); lg.addColorStop(0, a); lg.addColorStop(1, b); return lg; },
+    clipCircle: (x, y, r) => { g.save(); g.beginPath(); g.arc(x, y, r, 0, 7); g.clip(); },
+    unclip: () => g.restore(),
+    dot: (x, y, r, style, fill) => {
+      g.fillStyle = fill;
+      if (style === 'square') g.fillRect(x - r, y - r, 2 * r, 2 * r);
+      else if (style === 'rounded') { g.beginPath(); g.roundRect(x - r, y - r, 2 * r, 2 * r, r * 0.55); g.fill(); }
+      else { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+    },
+    ring: (x, y, radius, thick, fill) => { g.strokeStyle = fill; g.lineWidth = thick; g.beginPath(); g.arc(x, y, radius, 0, 7); g.stroke(); },
+    image: (img, x, y, s) => g.drawImage(img, x, y, s, s),
+    end: () => undefined,
+  };
+}
+function svgEm(W) {
+  let defs = '', body = '';
+  const q = (v) => (+v).toFixed(2);
+  return {
+    rect: (x, y, w, h, c) => { body += '<rect x="' + q(x) + '" y="' + q(y) + '" width="' + q(w) + '" height="' + q(h) + '" fill="' + c + '"/>'; },
+    disc: (x, y, r, c) => { body += '<circle cx="' + q(x) + '" cy="' + q(y) + '" r="' + q(r) + '" fill="' + c + '"/>'; },
+    gradient: (a, b, s) => { defs += '<linearGradient id="g" x1="0" y1="0" x2="' + s + '" y2="' + s + '" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="' + a + '"/><stop offset="1" stop-color="' + b + '"/></linearGradient>'; return 'url(#g)'; },
+    clipCircle: (x, y, r) => { defs += '<clipPath id="cc"><circle cx="' + q(x) + '" cy="' + q(y) + '" r="' + q(r) + '"/></clipPath>'; body += '<g clip-path="url(#cc)">'; },
+    unclip: () => { body += '</g>'; },
+    dot: (x, y, r, style, fill) => {
+      if (style === 'square') body += '<rect x="' + q(x - r) + '" y="' + q(y - r) + '" width="' + q(2 * r) + '" height="' + q(2 * r) + '" fill="' + fill + '"/>';
+      else if (style === 'rounded') body += '<rect x="' + q(x - r) + '" y="' + q(y - r) + '" width="' + q(2 * r) + '" height="' + q(2 * r) + '" rx="' + q(r * 0.55) + '" fill="' + fill + '"/>';
+      else body += '<circle cx="' + q(x) + '" cy="' + q(y) + '" r="' + q(r) + '" fill="' + fill + '"/>';
+    },
+    ring: (x, y, radius, thick, fill) => { body += '<circle cx="' + q(x) + '" cy="' + q(y) + '" r="' + q(radius) + '" fill="none" stroke="' + fill + '" stroke-width="' + q(thick) + '"/>'; },
+    image: (img, x, y, s) => { body += '<image x="' + q(x) + '" y="' + q(y) + '" width="' + q(s) + '" height="' + q(s) + '" href="' + logoData + '"/>'; },
+    end: () => '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + W + '" viewBox="0 0 ' + W + ' ' + W + '"><defs>' + defs + '</defs>' + body + '</svg>',
+  };
+}
+
+// ── Shared geometry: draw the QR through whichever emitter ──
+function build(em) {
+  const v = P.values, m = computeMatrix(), size = v.size;
+  if (!m) return em.end ? em.end() : undefined;
+  const count = m.count, margin = Math.round(v.margin), total = count + 2 * margin;
+
+  let cell, ox, oy, clip = false;
+  if (v.shape === 'disc') { const span = (size / Math.SQRT2) * 0.98; cell = span / total; ox = oy = (size - cell * total) / 2; }
+  else { cell = size / total; ox = oy = 0; if (v.shape === 'circle') clip = true; }
+
+  if (v.shape === 'disc' || v.shape === 'circle') { if (!v.transparent) em.disc(size / 2, size / 2, size / 2, v.bg); }
+  else if (!v.transparent) em.rect(0, 0, size, size, v.bg);
+
+  if (clip) em.clipCircle(size / 2, size / 2, size / 2 - cell * 0.5);
+
+  const fill = v.gradient ? em.gradient(v.fg, v.fg2, size) : v.fg;
+  const r = (cell / 2) * v.dotScale;
+  const dotR = (x, y, base) => {
+    if (!v.edgeFade || v.shape === 'square') return base;
+    const d = Math.hypot(x - size / 2, y - size / 2) / (size / 2);
+    return base * (1 - v.edgeFade * Math.min(1, d));
+  };
+  const half = (size * v.logoSize) / 2, cx0 = size / 2, cy0 = size / 2;
+  const inLogo = (x, y) => v.clearBehind && logoImg &&
+    Math.abs(x - cx0) < half + cell * 0.5 && Math.abs(y - cy0) < half + cell * 0.5;
+  const isFinder = (rr, cc) =>
+    (rr < 7 && cc < 7) || (rr < 7 && cc >= count - 7) || (rr >= count - 7 && cc < 7);
+
+  for (let rr = 0; rr < count; rr++) {
+    for (let cc = 0; cc < count; cc++) {
+      if (v.ringFinders && isFinder(rr, cc)) continue;
+      if (!m.isDark(rr, cc)) continue;
+      const x = ox + (cc + margin + 0.5) * cell, y = oy + (rr + margin + 0.5) * cell;
+      if (inLogo(x, y)) continue;
+      em.dot(x, y, dotR(x, y, r), v.dotStyle, fill);
+    }
+  }
+  if (clip) em.unclip();
+
+  if (v.ringFinders) {
+    const drawFinder = (x, y) => { em.ring(x, y, 3 * cell, cell, fill); em.dot(x, y, 1.5 * cell, 'round', fill); };
+    if (v.shape === 'circle') {
+      const R = size / 2 - cell * 0.5, len = R - 3.6 * cell, h = 1 / Math.SQRT2;
+      [[-1, -1], [1, -1], [-1, 1]].forEach(([dx, dy]) =>
+        drawFinder(size / 2 + dx * h * len, size / 2 + dy * h * len));
+    } else {
+      [[3, 3], [3, count - 4], [count - 4, 3]].forEach(([fr, fc]) =>
+        drawFinder(ox + (fc + margin + 0.5) * cell, oy + (fr + margin + 0.5) * cell));
+    }
+  }
+  if (logoImg) em.image(logoImg, cx0 - half, cy0 - half, half * 2);
+  return em.end ? em.end() : undefined;
+}
+
+// ── Render to screen as vector (inline SVG, not pixels) ──
+function render() {
+  document.getElementById('qr').innerHTML = build(svgEm(P.values.size));
+}
+
+function exportPNG() {
+  const size = P.values.size, off = document.createElement('canvas');
+  off.width = size; off.height = size;
+  build(canvasEm(off.getContext('2d')));
+  const a = document.createElement('a'); a.download = 'defaltho-qr.png'; a.href = off.toDataURL('image/png'); a.click();
+}
+function exportSVG() {
+  const str = build(svgEm(P.values.size));
+  const a = document.createElement('a'); a.download = 'defaltho-qr.svg';
+  a.href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(str); a.click();
+}
+
+// ── Show only the fields relevant to the chosen data type ──
+const FIELDS = {
+  url: ['data'],
+  contact: ['vcFirst', 'vcLast', 'vcOrg', 'vcTitle', 'vcPhone', 'vcEmail', 'vcUrl', 'vcAddr'],
+  wifi: ['wSsid', 'wPass', 'wEnc', 'wHidden'],
+  email: ['eTo', 'eSub', 'eBody'],
+  phone: ['pNum'],
+  sms: ['sNum', 'sBody'],
+  geo: ['gLat', 'gLng'],
+};
+function row(id) { const e = P.el(id); return e && e.closest ? e.closest('.ctl') : null; }
+function applyType() {
+  const show = FIELDS[P.values.dtype] || [];
+  Object.values(FIELDS).flat().forEach((id) => { const r = row(id); if (r) r.style.display = 'none'; });
+  show.forEach((id) => { const r = row(id); if (r) r.style.display = ''; });
+}
+
+// ── Controls ──
+const P = buildPanel(document.getElementById('controls'), [
+  { type: 'section', label: 'Data' },
+  { type: 'select', id: 'dtype', label: 'Type', val: 'url', options: [
+    { value: 'url', label: 'URL / Text' }, { value: 'contact', label: 'Contact (vCard)' },
+    { value: 'wifi', label: 'Wi-Fi' }, { value: 'email', label: 'Email' },
+    { value: 'phone', label: 'Phone' }, { value: 'sms', label: 'SMS' },
+    { value: 'geo', label: 'Location' }] },
+  { type: 'text', id: 'data', label: 'URL / text', val: 'https://www.instagram.com/defaltho', placeholder: 'https://…' },
+  { type: 'text', id: 'vcFirst', label: 'First name', val: '', placeholder: 'Jane' },
+  { type: 'text', id: 'vcLast', label: 'Last name', val: '', placeholder: 'Doe' },
+  { type: 'text', id: 'vcOrg', label: 'Organisation', val: '', placeholder: 'Studio' },
+  { type: 'text', id: 'vcTitle', label: 'Title', val: '', placeholder: 'Designer' },
+  { type: 'text', id: 'vcPhone', label: 'Phone', val: '', placeholder: '+351…' },
+  { type: 'text', id: 'vcEmail', label: 'Email', val: '', placeholder: 'name@mail.com' },
+  { type: 'text', id: 'vcUrl', label: 'Website', val: '', placeholder: 'https://…' },
+  { type: 'text', id: 'vcAddr', label: 'Address', val: '', placeholder: 'City, Country' },
+  { type: 'text', id: 'wSsid', label: 'Network (SSID)', val: '', placeholder: 'MyWiFi' },
+  { type: 'text', id: 'wPass', label: 'Password', val: '', placeholder: '••••••' },
+  { type: 'select', id: 'wEnc', label: 'Encryption', val: 'WPA', options: [
+    { value: 'WPA', label: 'WPA/WPA2' }, { value: 'WEP', label: 'WEP' }, { value: 'nopass', label: 'None' }] },
+  { type: 'toggle', id: 'wHidden', label: 'Hidden network', val: false },
+  { type: 'text', id: 'eTo', label: 'To', val: '', placeholder: 'name@mail.com' },
+  { type: 'text', id: 'eSub', label: 'Subject', val: '', placeholder: 'Hello' },
+  { type: 'text', id: 'eBody', label: 'Body', val: '', placeholder: 'Message…' },
+  { type: 'text', id: 'pNum', label: 'Phone number', val: '', placeholder: '+351…' },
+  { type: 'text', id: 'sNum', label: 'SMS number', val: '', placeholder: '+351…' },
+  { type: 'text', id: 'sBody', label: 'SMS text', val: '', placeholder: 'Message…' },
+  { type: 'text', id: 'gLat', label: 'Latitude', val: '', placeholder: '38.72' },
+  { type: 'text', id: 'gLng', label: 'Longitude', val: '', placeholder: '-9.14' },
+
+  { type: 'section', label: 'Shape & dots' },
+  { type: 'segmented', id: 'shape', label: 'Shape', val: 'circle', options: [
+    { value: 'square', label: 'Square' }, { value: 'disc', label: 'Disc' }, { value: 'circle', label: 'Circle*' }] },
+  { type: 'note', text: '*Circle = data clipped to a circle (the reference look) — decorative, may not scan. Disc = circular & scannable.' },
+  { type: 'select', id: 'dotStyle', label: 'Module', val: 'round', options: [
+    { value: 'round', label: 'Round' }, { value: 'rounded', label: 'Rounded' }, { value: 'square', label: 'Square' }] },
+  { type: 'slider', id: 'dotScale', label: 'Dot size', min: 0.5, max: 1, step: 0.05, val: 0.9 },
+  { type: 'slider', id: 'edgeFade', label: 'Edge fade', min: 0, max: 0.8, step: 0.05, val: 0 },
+  { type: 'toggle', id: 'ringFinders', label: 'Ring finders', val: true },
+
+  { type: 'section', label: 'Colour' },
+  { type: 'color', id: 'fg', label: 'Foreground', val: '#000000' },
+  { type: 'toggle', id: 'gradient', label: 'Gradient', val: false },
+  { type: 'color', id: 'fg2', label: 'Gradient 2nd', val: '#555555' },
+  { type: 'color', id: 'bg', label: 'Background', val: '#ffffff' },
+  { type: 'toggle', id: 'transparent', label: 'Transparent bg', val: false },
+
+  { type: 'section', label: 'Logo' },
+  { type: 'file', id: 'logo', label: 'Upload logo', accept: 'image/*',
+    onFile: (d) => { logoData = d; logoImg = new Image(); logoImg.onload = render; logoImg.src = d; } },
+  { type: 'slider', id: 'logoSize', label: 'Logo size', min: 0.1, max: 0.4, step: 0.02, val: 0.22 },
+  { type: 'toggle', id: 'clearBehind', label: 'Clear behind logo', val: true },
+  { type: 'button', id: 'rmLogo', label: 'Remove logo', onClick: () => { logoImg = logoData = null; render(); } },
+
+  { type: 'section', label: 'Quality' },
+  { type: 'select', id: 'ecl', label: 'Error correction', val: 'H', options: [
+    { value: 'L', label: 'L · 7%' }, { value: 'M', label: 'M · 15%' },
+    { value: 'Q', label: 'Q · 25%' }, { value: 'H', label: 'H · 30%' }] },
+  { type: 'slider', id: 'margin', label: 'Quiet zone', min: 0, max: 8, step: 1, val: 4 },
+  { type: 'slider', id: 'size', label: 'Size (px)', min: 240, max: 1200, step: 20, val: 600 },
+
+  { type: 'section', label: 'Export' },
+  { type: 'button', id: 'png', label: 'Export PNG', variant: 'primary', onClick: exportPNG },
+  { type: 'button', id: 'svg', label: 'Export SVG', onClick: exportSVG },
+], (vals, id) => { if (id === 'dtype') applyType(); render(); });
+
+applyType();
+render();
+
+document.addEventListener('keydown', (e) => {
+  const tag = (document.activeElement || {}).tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.key === 'h' || e.key === 'H') document.getElementById('panel').classList.toggle('hidden');
+});
+</script>
+</body>
+</html>
